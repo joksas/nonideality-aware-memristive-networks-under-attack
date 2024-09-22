@@ -1,0 +1,6 @@
+cleverhans>=4.0.0
+pytorch-ignite>=0.5.1
+torch>=2.0.1
+tensorboard>=2.13.0
+torchvision>=0.15.2
+torchattacks>=3.4.0

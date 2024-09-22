@@ -1,0 +1,11 @@
+figure.titlesize: 16
+axes.titlesize: 14
+axes.labelsize: 12
+xtick.labelsize: 10
+ytick.labelsize: 10
+lines.linewidth: 1.0
+
+legend.fontsize: 9
+
+font.family: sans-serif
+font.sans-serif: Arial
