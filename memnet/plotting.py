@@ -8,7 +8,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
 
-from . import attacks, data, iterators, layers, networks, nonidealities
+from . import data, iterators, layers, networks, nonidealities, experiments
 
 plt.style.use(os.path.join(os.path.dirname(__file__), "style.mplstyle"))
 
@@ -150,12 +150,13 @@ def sample_colormap(cmap_name, num_colors):
     ]
 
 
-def standard_ax_settings(fig, ax, dataset_name, colors):
-    ax.set_xlabel(r"$\epsilon$ in FGSM attack")
+def standard_ax_settings(fig, ax, dataset_name, colors, x, experiment: experiments.Experiment):
+    attack_name = experiments.get_attack_name(experiment)
+    ax.set_xlabel(rf"$\epsilon$ in {attack_name} attack")
     ax.set_ylabel(f"{dataset_name.pretty()} test accuracy (%)")
-    ax.set_xlim(0.0, 0.2)
+    ax.set_xlim(min(x), max(x))
     ax.set_ylim(0, 100)
-    ax.xaxis.set_ticks([0.05 * i for i in range(5)])
+    ax.xaxis.set_ticks(experiments.get_xticks(experiment))
     legend = fig.legend(
         frameon=False, loc="center", bbox_to_anchor=(0.5, 0.9), ncol=len(colors)
     )
@@ -164,11 +165,12 @@ def standard_ax_settings(fig, ax, dataset_name, colors):
         line.set_linewidth(1.5)
 
 
-def effect_of_nonidealities(dataset_name: data.DatasetName):
+def effect_of_nonidealities(experiment: experiments.Experiment):
     G_OFF, G_ON = 1e-4, 1e-3
     K_V = 0.5
-    EPSILONS = [0.01 * i for i in range(21)]
     NUM_HIDDEN = 32
+    epsilons = experiments.get_epsilons(experiment)
+    dataset_name = experiments.get_dataset_name(experiment)
 
     dataset = data.Dataset(dataset_name)
 
@@ -200,8 +202,8 @@ def effect_of_nonidealities(dataset_name: data.DatasetName):
     )
     stuck_high_accuracies = []
 
-    for eps in EPSILONS:
-        attack_instance = attacks.FGSM(attacks.AttackType.UNTARGETED, eps)
+    for eps in epsilons:
+        attack_instance = experiments.get_attack_instance(experiment, eps)
 
         label = f"ideal-attack-sees-ideal-{attack_instance.label()}"
         results = iterators.inference_results(ideal_model, label)
@@ -222,19 +224,20 @@ def effect_of_nonidealities(dataset_name: data.DatasetName):
     for accuracies, color in zip(
         [ideal_accuracies, stuck_low_accuracies, stuck_high_accuracies], colors
     ):
-        ax.plot(EPSILONS, accuracies, color=color, label=labels.pop(0))
+        ax.plot(epsilons, accuracies, color=color, label=labels.pop(0))
 
-    standard_ax_settings(fig, ax, dataset_name, colors)
+    standard_ax_settings(fig, ax, dataset_name, colors, epsilons, experiment)
 
-    filename = f"{dataset_name.name}-effect-of-nonidealities"
+    filename = f"{experiment.name}-effect-of-nonidealities"
     save_fig(fig, filename)
 
 
-def aware_training(dataset_name: data.DatasetName):
+def aware_training(experiment: experiments.Experiment):
     G_OFF, G_ON = 1e-4, 1e-3
     K_V = 0.5
-    EPSILONS = [0.01 * i for i in range(21)]
     NUM_HIDDEN = 32
+    epsilons = experiments.get_epsilons(experiment)
+    dataset_name = experiments.get_dataset_name(experiment)
 
     dataset = data.Dataset(dataset_name)
 
@@ -263,8 +266,8 @@ def aware_training(dataset_name: data.DatasetName):
     )
     aware_stuck_high_accuracies = []
 
-    for eps in EPSILONS:
-        attack_instance = attacks.FGSM(attacks.AttackType.UNTARGETED, eps)
+    for eps in epsilons:
+        attack_instance = experiments.get_attack_instance(experiment, eps)
 
         label = f"nonideal-stuck-high-attack-sees-ideal-{attack_instance.label()}"
         results = iterators.inference_results(stuck_high_model, label, ideal_model)
@@ -281,20 +284,22 @@ def aware_training(dataset_name: data.DatasetName):
     for accuracies, color in zip(
         [stuck_high_accuracies, aware_stuck_high_accuracies], colors
     ):
-        ax.plot(EPSILONS, accuracies, color=color, label=labels.pop(0))
+        ax.plot(epsilons, accuracies, color=color, label=labels.pop(0))
 
-    standard_ax_settings(fig, ax, dataset_name, colors)
+    standard_ax_settings(fig, ax, dataset_name, colors, epsilons, experiment)
     ax.set_title("Network designer's training assumptions")
 
-    filename = f"{dataset_name.name}-aware-training"
+    filename = f"{experiment.name}-aware-training"
     save_fig(fig, filename)
 
 
-def defender_assumptions(dataset_name: data.DatasetName):
+def defender_assumptions(experiment: experiments.Experiment):
     G_OFF, G_ON = 1e-4, 1e-3
     K_V = 0.5
-    EPSILONS = [0.01 * i for i in range(21)]
     NUM_HIDDEN = 32
+    epsilons = experiments.get_epsilons(experiment)
+    dataset_name = experiments.get_dataset_name(experiment)
+    attack_name = experiments.get_attack_name(experiment)
 
     dataset = data.Dataset(dataset_name)
 
@@ -355,8 +360,9 @@ def defender_assumptions(dataset_name: data.DatasetName):
     aware_stuck_low_exposed_to_high_accuracies = []
     aware_stuck_high_exposed_to_low_accuracies = []
 
-    for eps in EPSILONS:
-        attack_instance = attacks.FGSM(attacks.AttackType.UNTARGETED, eps)
+    for eps in epsilons:
+        attack_instance = experiments.get_attack_instance(experiment, eps)
+
 
         label = f"nonideal-stuck-low-attack-sees-ideal-{attack_instance.label()}"
         results = iterators.inference_results(stuck_low_model, label, ideal_model)
@@ -417,13 +423,13 @@ def defender_assumptions(dataset_name: data.DatasetName):
         colors,
         linestyle,
     ):
-        ax.plot(EPSILONS, accuracies, color=color, linestyle=style, label=labels.pop(0))
+        ax.plot(epsilons, accuracies, color=color, linestyle=style, label=labels.pop(0))
 
-    ax.set_xlabel(r"$\epsilon$ in FGSM attack")
+    ax.set_xlabel(rf"$\epsilon$ in {attack_name} attack")
     ax.set_ylabel(f"{dataset_name.pretty()} test accuracy (%)")
-    ax.set_xlim(0.0, 0.2)
+    ax.set_xlim(min(epsilons), max(epsilons))
     ax.set_ylim(0, 100)
-    ax.xaxis.set_ticks([0.05 * i for i in range(5)])
+    ax.xaxis.set_ticks(experiments.get_xticks(experiment))
     legend = fig.legend(frameon=False, loc="center", bbox_to_anchor=(0.75, 0.8), ncol=1)
     # Increase the linewidth of the legend lines.
     for line in legend.get_lines():
@@ -431,5 +437,5 @@ def defender_assumptions(dataset_name: data.DatasetName):
 
     ax.set_title("Network designer's training assumptions vs reality")
 
-    filename = f"{dataset_name.name}-defender-assumptions"
+    filename = f"{experiment.name}-defender-assumptions"
     save_fig(fig, filename)

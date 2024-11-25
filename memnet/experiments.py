@@ -1,17 +1,54 @@
 from copy import deepcopy
+from enum import Enum
 
 import torch
 
 from . import attacks, data, iterators, layers, networks, nonidealities
 
+class Experiment(Enum):
+    FMNIST_FGSM = "FMNIST_FGSM"
+    MNIST_FGSM = "MNIST_FGSM"
+    FMNIST_PGD = "FMNIST_PGD"
 
-def experiment(dataset_name: data.DatasetName):
+def get_dataset_name(experiment: Experiment) -> data.DatasetName:
+    if experiment == Experiment.FMNIST_FGSM or experiment == Experiment.FMNIST_PGD:
+        return data.DatasetName.FASHION_MNIST
+
+    return data.DatasetName.MNIST
+    
+def get_epsilons(experiment: Experiment) -> list[float]:
+    if experiment == Experiment.FMNIST_FGSM or experiment == Experiment.MNIST_FGSM:
+        return [0.01 * i for i in range(21)]
+
+    return [0.0, 0.2, 0.5, 0.7, 1.0, 2.0, 5.0]
+    
+def get_attack_instance(experiment: Experiment, eps: float) -> attacks.Attack:
+    if experiment == Experiment.FMNIST_FGSM or experiment == Experiment.MNIST_FGSM or eps == 0.0:
+        return attacks.FGSM(attacks.AttackType.UNTARGETED, eps)
+
+    return attacks.PGD_L2(attacks.AttackType.UNTARGETED, eps, 0.2, 10)
+
+def get_attack_name(experiment: Experiment) -> str:
+    if experiment == Experiment.FMNIST_FGSM or experiment == Experiment.MNIST_FGSM:
+        return "FGSM"
+    
+    return "PGD"
+
+def get_xticks(experiment: Experiment) -> list[float]:
+    if experiment == Experiment.FMNIST_FGSM or experiment == Experiment.MNIST_FGSM:
+        return [0.0, 0.05, 0.10, 0.15, 0.20]
+
+    return [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+
+
+def run(experiment: Experiment):
     CRITERION = torch.nn.CrossEntropyLoss()
     NUM_EPOCHS = 10
     G_OFF, G_ON = 1e-4, 1e-3
     K_V = 0.5
-    EPSILONS = [0.01 * i for i in range(21)]
     NUM_HIDDEN = 32
+    epsilons = get_epsilons(experiment)
+    dataset_name= get_dataset_name(experiment)
 
     dataset = data.Dataset(dataset_name)
 
@@ -93,9 +130,9 @@ def experiment(dataset_name: data.DatasetName):
         )
     )
 
-    for eps in EPSILONS:
+    for eps in epsilons:
         print(f"\teps: {eps}")
-        attack_instance = attacks.FGSM(attacks.AttackType.UNTARGETED, eps)
+        attack_instance = get_attack_instance(experiment, eps)
 
         label = f"ideal-attack-sees-ideal-{attack_instance.label()}"
         ideal_attack_dataset = make_attack_test_dataset(
@@ -250,11 +287,10 @@ def make_attack_test_dataset(
     model: networks.MemristiveNet,
 ) -> data.Dataset:
     attack_dataset = deepcopy(dataset)
-    attack_loader, distances = attack.apply(
+    attack_loader = attack.apply(
         model,
         attack_dataset,
         data.Subset.TEST,
     )
-    # print(f"\t\tAverage distance: {distances.mean()}")
     attack_dataset.set_loader(data.Subset.TEST, attack_loader)
     return attack_dataset

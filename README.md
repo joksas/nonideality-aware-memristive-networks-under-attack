@@ -9,11 +9,12 @@ pip install -r requirements.txt
 ### 2. Run Python script
 
 ```python
-from memnet import data, experiments, plotting
+from memnet import experiments, plotting
+from memnet.experiments import Experiment
 
-for dataset_name in [data.DatasetName.FASHION_MNIST, data.DatasetName.MNIST]:
-    experiments.experiment(dataset_name)
-    plotting.effect_of_nonidealities(dataset_name)
-    plotting.aware_training(dataset_name)
-    plotting.defender_assumptions(dataset_name)
+for experiment in [Experiment.FMNIST_FGSM, Experiment.MNIST_FGSM, Experiment.FMNIST_PGD]:
+    experiments.run(experiment)
+    plotting.effect_of_nonidealities(experiment)
+    plotting.aware_training(experiment)
+    plotting.defender_assumptions(experiment)
 ```
